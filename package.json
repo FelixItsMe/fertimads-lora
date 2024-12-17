@@ -1,0 +1,16 @@
+{
+  "name": "fertimads-lora",
+  "version": "1.0.0",
+  "description": "save data from serial port",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "inquirer": "^12.2.0",
+    "serialport": "^12.0.0"
+  }
+}
