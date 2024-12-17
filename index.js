@@ -1,5 +1,9 @@
 import { SerialPort } from "serialport";
 import inquirer from "inquirer";
+import { SerialPortStream } from "@serialport/stream";
+import { MockBinding } from "@serialport/binding-mock";
+
+MockBinding.createPort('/dev/ROBOT', { echo: true, record: true })
 
 let loraPort
 let portsPath = []
@@ -38,9 +42,20 @@ const pickSerialPort = async () => {
 
     console.log(`Tersambung dengan port ${port}`);
 
+    // loraPort = new SerialPortStream({
+    //     binding: MockBinding,
+    //     path: '/dev/ROBOT',
+    //     baudRate: 115200
+    // })
+
+    // loraPort.on('open', () => {
+    //     loraPort.port.emitData(JSON.stringify({"type":"sensor","lahanID":1,"sensor":{"Humidity":13,"Temperature":31.4,"Ec":50,"Ph":7,"Nitrogen":3,"Phosporus":5,"Kalium":10}}))
+    // })
+
     loraPort.on('data', function (data) {
         try {
-            console.log(data);
+            let decodeData = new TextDecoder().decode(data)
+            console.log(decodeData);
         } catch (error) {
             console.error(error)
         }
