@@ -166,7 +166,8 @@ SerialPort.list().then(function (ports) {
 
             const dataQuery = {
                 garden_id: lahanID,
-                samples: JSON.stringify(sensor)
+                samples: JSON.stringify(sensor),
+                created_at: createCurrentDate(),
             };
 
             connection.query(
