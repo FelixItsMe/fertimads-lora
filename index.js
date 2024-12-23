@@ -129,7 +129,7 @@ const connection = mysql.createConnection({
     database: process.env.DB_NAME,
 });
 
-const portRegex = /Silicon_Labs_CP2102_USB_to_UART_Bridge/g;
+const portRegex = /USB\\VID_10C4&PID_EA60\\0001/g;
 
 SerialPort.list().then(function (ports) {
     // Open a serial port for each available port
@@ -157,10 +157,16 @@ SerialPort.list().then(function (ports) {
     //   console.log("Port open");
     // });
 
-    port.on('data', function (data) {
+    const parser = port.pipe(new ReadlineParser({ delimiter: "\n" }));
+    parser.on('data', function (data) {
         try {
-            let decodeData = new TextDecoder().decode(data)
-            const { lahanID, sensor } = JSON.parse(decodeData)
+            console.log(data);
+            
+            // let decodeData = new TextDecoder().decode(data)
+            // console.log(decodeData);
+            console.log("------");
+            
+            const { lahanID, sensor } = JSON.parse(data)
 
             checkSensorParams(sensor)
 
