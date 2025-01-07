@@ -6,6 +6,11 @@ import { ReadlineParser } from "@serialport/parser-readline";
 import mysql from "mysql";
 import express from "express";
 import 'dotenv/config'
+import cors from "cors";
+import bodyParser from "body-parser";
+
+
+let serialPorts = [];
 
 MockBinding.createPort('/dev/ROBOT', { echo: true, record: true })
 // const port = new SerialPortStream({ binding: MockBinding, path: '/dev/ROBOT', baudRate: 14400 })
@@ -35,7 +40,6 @@ function checkSensorParams({ Humidity = null, Temperature = null, Ec = null, Ph 
 
     return true
 }
-
 
 const createCurrentDate = () => {
     let date_ob = new Date();
@@ -119,7 +123,11 @@ const createCurrentDate = () => {
 //     loraPort.port.emitData(JSON.stringify({ "type": "sensor", "lahanID": 1, "sensor": { "Humidity": Math.random(), "Temperature": 31.4, "Ec": 50, "Ph": 7, "Nitrogen": 3, "Phosporus": 5, "Kalium": 10 } }))
 // }, 5000);
 
+let defaultPort
 const app = express();
+
+app.use(cors());
+app.use(bodyParser.json());
 
 // Create a connection to the MySQL database
 const connection = mysql.createConnection({
@@ -129,9 +137,19 @@ const connection = mysql.createConnection({
     database: process.env.DB_NAME,
 });
 
-const portRegex = /USB\\VID_10C4&PID_EA60\\0001/g;
+// const portRegex = /USB\\VID_1A86&PID_55D3\\56CC054334/g;
+const portRegex = new RegExp(process.env.PORT_PNPID_DEFAULT, 'g');
 
 SerialPort.list().then(function (ports) {
+    // ports.forEach(function (port) {
+    //     const serialPort = new SerialPort({
+    //         path: port.path,
+    //         baudRate: 115200,
+    //         autoOpen: false,
+    //     });
+
+    //     serialPorts.push(serialPort);
+    // });
     // Open a serial port for each available port
     console.log(ports);
     const found = ports.find(port => port.pnpId?.match(portRegex) != null)
@@ -143,29 +161,29 @@ SerialPort.list().then(function (ports) {
         return false
     }
 
-    const port = new SerialPort({
+    defaultPort = new SerialPort({
         path: found.path,
         baudRate: 115200,
     });
 
-    // port.open((err) => {
-    //   let errMessage = null;
-    //   if (err) {
-    //     return console.log("Error opening port: ", err.message);
-    //   }
+    defaultPort.open((err) => {
+      let errMessage = null;
+      if (err) {
+        return console.log("Error opening port: ", err.message);
+      }
 
-    //   console.log("Port open");
-    // });
+      console.log("Port open");
+    });
 
-    const parser = port.pipe(new ReadlineParser({ delimiter: "\n" }));
+    const parser = defaultPort.pipe(new ReadlineParser({ delimiter: "\n" }));
     parser.on('data', function (data) {
         try {
             console.log(data);
-            
+
             // let decodeData = new TextDecoder().decode(data)
             // console.log(decodeData);
             console.log("------");
-            
+
             const { lahanID, sensor } = JSON.parse(data)
 
             checkSensorParams(sensor)
@@ -189,6 +207,135 @@ SerialPort.list().then(function (ports) {
             console.error(error)
         }
     })
+});
+
+
+app.get("/ports", async (req, res) => {
+    const ports = await SerialPort.list();
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Content-Type", "application/json");
+
+    res.json(ports.map((val, i) => {
+        return {
+            path: val.path,
+            isOpen: false,
+        };
+    }));
+    res.end();
+});
+
+app.post("/open", async (req, res) => {
+    // const portIndex = serialPorts.findIndex((p) => p.path === req.body.portPath);
+
+    if (!defaultPort) {
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.status(400);
+        res.send({
+            error: {
+                message: "Port Tidak ditemukan",
+            },
+            // ports: serialPorts,
+        });
+        return console.log("Error opening port: ", "Port tidak ditemukan");
+    }
+
+    const port = defaultPort;
+
+    console.log(port);
+
+    if (port.isOpen) {
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.status(400);
+        res.send({
+            message: "Port already open",
+        });
+        return console.log("Error opening port: ", "Port already open");
+    }
+
+    port.open((err) => {
+        console.log("Port open");
+        let errMessage = null;
+        if (err) {
+            console.log(err);
+            res.status(500);
+            res.send({
+                message: err.message,
+            });
+            return console.log("Error opening port: ", err.message);
+        }
+        res.json({ status: "ok" });
+        res.end();
+    });
+
+    const parser = port.pipe(new ReadlineParser({ delimiter: "\n" }));
+    parser.on('data', function (data) {
+        try {
+            console.log(data);
+
+            // let decodeData = new TextDecoder().decode(data)
+            // console.log(decodeData);
+            console.log("------");
+
+            const { lahanID, sensor } = JSON.parse(data)
+
+            checkSensorParams(sensor)
+
+            const dataQuery = {
+                garden_id: lahanID,
+                samples: JSON.stringify(sensor),
+                created_at: createCurrentDate(),
+            };
+
+            connection.query(
+                "INSERT INTO fix_stations SET ?",
+                dataQuery,
+                function (err, result) {
+                    if (err) throw err;
+                    console.log("Data inserted successfully.");
+                    // console.log('Result:', result);
+                }
+            );
+        } catch (error) {
+            console.error(error)
+        }
+    })
+});
+
+app.post("/close", (req, res) => {
+    // const portIndex = serialPorts.findIndex((p) => p.path === req.body.portPath);
+
+    if (!defaultPort) {
+        res.status(400);
+        res.send({
+            message: "Port Tidak ditemukan",
+        });
+        return console.log("Error opening port: ", "Port tidak ditemukan");
+    }
+
+    const port = defaultPort;
+
+    if (!port.isOpen) {
+        res.status(400);
+        res.send({
+            message: "Port already close",
+        });
+        return console.log("Error opening port: ", "Port already close");
+    }
+
+    port.close((err) => {
+        if (err) {
+            console.log(err);
+            res.status(500);
+            res.send({
+                message: err.message,
+            });
+            return console.log("Error opening port: ", err.message);
+        }
+
+        console.log("Port close");
+        res.json({ status: "ok" });
+        res.end();
+    });
 });
 
 // Connect to the database
