@@ -224,6 +224,18 @@ app.get("/ports", async (req, res) => {
     res.end();
 });
 
+app.get("/port-status", async (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Content-Type", "application/json");
+
+    const port = defaultPort
+
+    res.json({
+        is_open: port?.isOpen || false
+    });
+    res.end();
+});
+
 app.post("/open", async (req, res) => {
     // const portIndex = serialPorts.findIndex((p) => p.path === req.body.portPath);
 
@@ -231,9 +243,7 @@ app.post("/open", async (req, res) => {
         res.setHeader("Access-Control-Allow-Origin", "*");
         res.status(400);
         res.send({
-            error: {
-                message: "Port Tidak ditemukan",
-            },
+            message: "Port Tidak ditemukan",
             // ports: serialPorts,
         });
         return console.log("Error opening port: ", "Port tidak ditemukan");
