@@ -182,7 +182,6 @@ SerialPort.list().then(function (ports) {
 
             // let decodeData = new TextDecoder().decode(data)
             // console.log(decodeData);
-            console.log("------");
 
             const { lahanID, sensor } = JSON.parse(data)
 
@@ -276,39 +275,6 @@ app.post("/open", async (req, res) => {
         res.json({ status: "ok" });
         res.end();
     });
-
-    const parser = port.pipe(new ReadlineParser({ delimiter: "\n" }));
-    parser.on('data', function (data) {
-        try {
-            console.log(data);
-
-            // let decodeData = new TextDecoder().decode(data)
-            // console.log(decodeData);
-            console.log("------");
-
-            const { lahanID, sensor } = JSON.parse(data)
-
-            checkSensorParams(sensor)
-
-            const dataQuery = {
-                garden_id: lahanID,
-                samples: JSON.stringify(sensor),
-                created_at: createCurrentDate(),
-            };
-
-            connection.query(
-                "INSERT INTO fix_stations SET ?",
-                dataQuery,
-                function (err, result) {
-                    if (err) throw err;
-                    console.log("Data inserted successfully.");
-                    // console.log('Result:', result);
-                }
-            );
-        } catch (error) {
-            console.error(error)
-        }
-    })
 });
 
 app.post("/close", (req, res) => {
